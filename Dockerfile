@@ -30,8 +30,9 @@ RUN echo "<Directory /var/www/html/public>\n\
     AllowOverride All\n\
 </Directory>" >> /etc/apache2/apache2.conf
 
-# Generate key otomatis (opsional)
-RUN php artisan key:generate
+# Note: APP_KEY akan di-set via environment variable di Railway
+# Tidak perlu generate key di Dockerfile karena .env tidak ada saat build
+# Pastikan set APP_KEY di Railway dashboard: php artisan key:generate --show
 
 # Jalankan Apache di port 8080 (Railway otomatis detect)
 EXPOSE 8080
