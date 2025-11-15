@@ -21,11 +21,14 @@ RUN composer install --no-dev --optimize-autoloader
 # Set permission
 RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache
 
+# Create storage link (jika belum ada)
+RUN php artisan storage:link || true
+
 # Ubah Apache DocumentRoot ke folder public Laravel
 RUN sed -i 's|/var/www/html|/var/www/html/public|' /etc/apache2/sites-available/000-default.conf
 
-# Aktifkan mod_rewrite untuk Laravel route
-RUN a2enmod rewrite
+# Aktifkan mod_rewrite dan mod_headers untuk Laravel route dan CORS
+RUN a2enmod rewrite headers
 RUN echo "<Directory /var/www/html/public>\n\
     AllowOverride All\n\
 </Directory>" >> /etc/apache2/apache2.conf
@@ -46,6 +49,12 @@ set -e\n\
 \n\
 # Set port dari environment variable (default 8080)\n\
 PORT=${PORT:-8080}\n\
+\n\
+# Create storage link jika belum ada\n\
+php artisan storage:link || true\n\
+\n\
+# Clear config cache\n\
+php artisan config:clear || true\n\
 \n\
 # Update Apache ports.conf\n\
 sed -i "s/^Listen .*/Listen $PORT/" /etc/apache2/ports.conf\n\
