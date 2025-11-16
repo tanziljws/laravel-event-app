@@ -23,7 +23,7 @@ class RegisterRequest extends FormRequest
     {
         return [
             'name' => 'required|string|max:100',
-            'email' => 'required|email|unique:users,email',
+            'email' => 'required|email', // Removed unique:users,email karena user belum dibuat
             'phone' => 'required|string|max:20',
             'address' => 'required|string|max:255',
             'education' => 'required|in:SD,SMP,SMA,SMK,D3,S1,S2,S3',

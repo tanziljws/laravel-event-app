@@ -19,9 +19,14 @@ use App\Http\Controllers\Api\BannerController;
 use App\Http\Controllers\Api\Admin\BannerController as AdminBannerController;
 use App\Http\Controllers\Api\Admin\FotoController as AdminFotoController;
 
-Route::post('/auth/register', [AuthController::class, 'register']);
-Route::post('/auth/verify-email', [AuthController::class, 'verifyEmail']);
-Route::post('/auth/resend-otp', [AuthController::class, 'resendOtp']);
+// Auth routes yang memerlukan session (registration flow)
+Route::middleware('api.session')->group(function () {
+    Route::post('/auth/register', [AuthController::class, 'register']);
+    Route::post('/auth/verify-email', [AuthController::class, 'verifyEmail']);
+    Route::post('/auth/resend-otp', [AuthController::class, 'resendOtp']);
+});
+
+// Auth routes yang tidak memerlukan session
 Route::post('/auth/login', [AuthController::class, 'login']);
 Route::post('/auth/request-reset', [AuthController::class, 'requestReset']);
 Route::post('/auth/reset-password', [AuthController::class, 'resetPassword']);

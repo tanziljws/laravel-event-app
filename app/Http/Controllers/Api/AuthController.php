@@ -11,141 +11,195 @@ use App\Models\EmailOtp;
 use App\Jobs\SendOtpJob;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
+use Carbon\Carbon;
 
 class AuthController extends Controller {
     public function register(RegisterRequest $req){
         try {
-            $user = User::create([
-                'name'=>$req->name,
-                'email'=>$req->email,
-                'phone'=>$req->phone,
-                'address'=>$req->address,
-                'education'=>$req->education,
-                'password'=>Hash::make($req->password)
+            // Normalize email (lowercase, trim)
+            $email = strtolower(trim($req->email));
+            
+            // Cek apakah email sudah terdaftar
+            if (User::where('email', $email)->exists()) {
+                return response()->json([
+                    'message' => 'Email sudah terdaftar. Silakan gunakan email lain atau login.',
+                    'error_type' => 'email_exists'
+                ], 422);
+            }
+
+            // Generate OTP (6 digit random)
+            $otp = str_pad((string)random_int(0,999999),6,'0',STR_PAD_LEFT);
+            
+            // Simpan data di SESSION (BUKAN database!)
+            session([
+                'pending_registration' => [
+                    'name' => trim($req->name),
+                    'email' => $email,
+                    'phone' => trim($req->phone),
+                    'address' => trim($req->address),
+                    'education' => $req->education,
+                    'password' => $req->password, // Akan di-hash saat create user
+                    'otp_code' => $otp,
+                    'otp_expires_at' => Carbon::now()->addMinutes(10)->toDateTimeString(),
+                ]
             ]);
 
-            $otp = str_pad((string)random_int(0,999999),6,'0',STR_PAD_LEFT);
-            EmailOtp::create([
-                'user_id'=>$user->id,
-                'code_hash'=>Hash::make($otp),
-                'type'=>'verification',
-                'expires_at'=>now()->addMinutes(10)
+            Log::info('Registration data saved to session', [
+                'email' => $email,
+                'otp_expires_at' => session('pending_registration')['otp_expires_at']
             ]);
 
             // Send OTP via email (sync untuk memastikan langsung terkirim)
             try {
-                \Log::info('Sending OTP email for registration', [
-                    'user_id' => $user->id,
-                    'email' => $user->email,
+                Log::info('Sending OTP email for registration', [
+                    'email' => $email,
                     'otp' => $otp
                 ]);
                 
-                // Call BrevoService directly instead of using Job for immediate execution
+                // Call BrevoService directly
                 $brevoService = new \App\Services\BrevoService();
                 $result = $brevoService->sendEmailWithView(
-                    $user->email,
-                    $user->name,
+                    $email,
+                    trim($req->name),
                     'Verifikasi Email - EduFest',
                     'emails.otp',
                     [
-                        'user' => $user,
+                        'user' => (object)[
+                            'name' => trim($req->name),
+                            'email' => $email
+                        ],
                         'otp' => $otp,
                         'type' => 'verification'
                     ]
                 );
                 
                 if ($result['success']) {
-                    \Log::info('OTP email sent successfully', [
-                        'user_id' => $user->id,
-                        'email' => $user->email,
+                    Log::info('OTP email sent successfully', [
+                        'email' => $email,
                         'message_id' => $result['message_id'] ?? 'N/A'
                     ]);
                 } else {
-                    \Log::error('Failed to send OTP email during registration', [
-                        'user_id' => $user->id,
-                        'email' => $user->email,
+                    Log::error('Failed to send OTP email during registration', [
+                        'email' => $email,
                         'error' => $result['error'] ?? 'Unknown error',
                         'full_error' => $result['full_error'] ?? null
                     ]);
+                    // Clear session jika email gagal
+                    session()->forget('pending_registration');
+                    return response()->json([
+                        'message' => 'Gagal mengirim email OTP. Silakan coba lagi.',
+                        'error' => $result['error'] ?? 'Unknown error'
+                    ], 500);
                 }
             } catch (\Exception $emailError) {
-                \Log::error('Exception sending OTP email during registration', [
-                    'user_id' => $user->id,
-                    'email' => $user->email,
+                Log::error('Exception sending OTP email during registration', [
+                    'email' => $email,
                     'error' => $emailError->getMessage(),
                     'trace' => $emailError->getTraceAsString()
                 ]);
-                // Don't fail registration if email fails, but log it
+                // Clear session jika email gagal
+                session()->forget('pending_registration');
+                return response()->json([
+                    'message' => 'Gagal mengirim email OTP: ' . $emailError->getMessage()
+                ], 500);
             }
 
             return response()->json([
-                'message'=>'Registered. Check email for OTP.',
-                'user_id'=>$user->id
-            ],201);
+                'message' => 'Registrasi berhasil. Silakan periksa email Anda untuk kode OTP.',
+                'email' => $email
+            ], 201);
         } catch (\Exception $e) {
-            \Log::error('Registration failed', [
+            Log::error('Registration failed', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()
             ]);
+            // Clear session on error
+            session()->forget('pending_registration');
             return response()->json([
-                'message' => 'Registration failed: ' . $e->getMessage()
+                'message' => 'Registrasi gagal: ' . $e->getMessage()
             ], 500);
         }
     }
 
     public function verifyEmail(VerifyOtpRequest $req){
-        // Debug: Check all OTPs for this user
-        $allOtps = EmailOtp::where('user_id',$req->user_id)
-            ->where('type','verification')
-            ->get();
+        try {
+            // Ambil data dari session
+            $pendingRegistration = session('pending_registration');
+            
+            if (!$pendingRegistration) {
+                return response()->json([
+                    'message' => 'Sesi registrasi tidak ditemukan. Silakan daftar ulang.',
+                    'error_type' => 'session_expired'
+                ], 404);
+            }
 
-        // Check if EmailOtp exists first
-        $otp = EmailOtp::where('user_id',$req->user_id)
-            ->where('type','verification')
-            ->whereNull('used_at')
-            ->where('expires_at','>=',now())
-            ->latest()
-            ->first();
+            // 1. Cek OTP Expiry (10 menit)
+            $otpExpiresAt = Carbon::parse($pendingRegistration['otp_expires_at']);
+            if (Carbon::now()->greaterThan($otpExpiresAt)) {
+                // Clear expired session
+                session()->forget('pending_registration');
+                return response()->json([
+                    'message' => 'OTP kedaluwarsa. Silakan daftar ulang atau request OTP baru.',
+                    'error_type' => 'otp_expired'
+                ], 422);
+            }
 
-        if(!$otp){
+            // 2. Verify OTP (compare plain text, tidak perlu hash karena di session)
+            if ($req->code !== $pendingRegistration['otp_code']) {
+                return response()->json([
+                    'message' => 'OTP tidak valid. Silakan periksa kembali kode OTP Anda.',
+                    'error_type' => 'invalid_otp'
+                ], 422);
+            }
+
+            // 3. OTP Valid! Cek apakah email masih available (race condition check)
+            $email = $pendingRegistration['email'];
+            if (User::where('email', $email)->exists()) {
+                session()->forget('pending_registration');
+                return response()->json([
+                    'message' => 'Email sudah terdaftar. Silakan login.',
+                    'error_type' => 'email_exists'
+                ], 409);
+            }
+
+            // 4. Create User di Database
+            $user = User::create([
+                'name' => $pendingRegistration['name'],
+                'email' => $email,
+                'phone' => $pendingRegistration['phone'],
+                'address' => $pendingRegistration['address'],
+                'education' => $pendingRegistration['education'],
+                'password' => Hash::make($pendingRegistration['password']),
+                'email_verified_at' => now(), // Langsung verified karena sudah verify OTP
+            ]);
+
+            Log::info('User created after OTP verification', [
+                'user_id' => $user->id,
+                'email' => $user->email
+            ]);
+
+            // 5. Bersihkan session
+            session()->forget('pending_registration');
+
+            // 6. Auto login user (create token)
+            $token = $user->createToken('api')->plainTextToken;
+
             return response()->json([
-                'message'=>'No valid OTP found. Please register first or request new OTP.',
-                'debug_info' => [
-                    'user_id' => $req->user_id,
-                    'total_otps' => $allOtps->count(),
-                    'otps' => $allOtps->map(function($item) {
-                        return [
-                            'id' => $item->id,
-                            'used_at' => $item->used_at,
-                            'expires_at' => $item->expires_at,
-                            'expired' => $item->expires_at < now(),
-                            'used' => !is_null($item->used_at)
-                        ];
-                    })
-                ]
-            ], 404);
+                'message' => 'Email berhasil diverifikasi. Akun Anda telah dibuat.',
+                'user' => $user,
+                'token' => $token,
+                'is_admin' => $user->isAdmin()
+            ], 200);
+        } catch (\Exception $e) {
+            Log::error('Email verification failed', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            return response()->json([
+                'message' => 'Verifikasi gagal: ' . $e->getMessage()
+            ], 500);
         }
-
-        if(!Hash::check($req->code, $otp->code_hash)){
-            return response()->json(['message'=>'Invalid OTP'],422);
-        }
-
-        $otp->update(['used_at'=>now()]);
-        
-        // Use DB query instead of Eloquent for direct update
-        $updated = \DB::table('users')
-            ->where('id', $req->user_id)
-            ->update(['email_verified_at' => now()]);
-        
-        // Get fresh user data
-        $user = User::find($req->user_id);
-
-        return response()->json([
-            'message'=>'Email verified successfully',
-            'user_id' => $user->id,
-            'email_verified_at' => $user->email_verified_at,
-            'update_success' => $updated > 0
-        ]);
     }
 
     public function login(LoginRequest $req){
@@ -263,27 +317,82 @@ class AuthController extends Controller {
     }
 
     public function resendOtp(Request $req){
-        $req->validate([
-            'user_id' => 'required|exists:users,id'
-        ]);
+        try {
+            // Ambil data dari session
+            $pendingRegistration = session('pending_registration');
+            
+            if (!$pendingRegistration) {
+                return response()->json([
+                    'message' => 'Sesi registrasi tidak ditemukan. Silakan daftar ulang.',
+                    'error_type' => 'session_expired'
+                ], 404);
+            }
 
-        $user = User::findOrFail($req->user_id);
+            // Generate OTP baru
+            $otp = str_pad((string)random_int(0,999999),6,'0',STR_PAD_LEFT);
+            
+            // Update OTP di session
+            $pendingRegistration['otp_code'] = $otp;
+            $pendingRegistration['otp_expires_at'] = Carbon::now()->addMinutes(10)->toDateTimeString();
+            session(['pending_registration' => $pendingRegistration]);
 
-        // Generate new OTP
-        $otp = str_pad((string)random_int(0,999999),6,'0',STR_PAD_LEFT);
-        EmailOtp::create([
-            'user_id'=>$user->id,
-            'code_hash'=>Hash::make($otp),
-            'type'=>'verification',
-            'expires_at'=>now()->addMinutes(10)
-        ]);
+            Log::info('Resending OTP for registration', [
+                'email' => $pendingRegistration['email']
+            ]);
 
-        // Send OTP via email (sync untuk memastikan langsung terkirim)
-        SendOtpJob::dispatchSync($user, $otp, 'verification');
+            // Send OTP via email (sync untuk memastikan langsung terkirim)
+            try {
+                $brevoService = new \App\Services\BrevoService();
+                $result = $brevoService->sendEmailWithView(
+                    $pendingRegistration['email'],
+                    $pendingRegistration['name'],
+                    'Verifikasi Email - EduFest',
+                    'emails.otp',
+                    [
+                        'user' => (object)[
+                            'name' => $pendingRegistration['name'],
+                            'email' => $pendingRegistration['email']
+                        ],
+                        'otp' => $otp,
+                        'type' => 'verification'
+                    ]
+                );
+                
+                if ($result['success']) {
+                    Log::info('Resend OTP email sent successfully', [
+                        'email' => $pendingRegistration['email'],
+                        'message_id' => $result['message_id'] ?? 'N/A'
+                    ]);
+                } else {
+                    Log::error('Failed to resend OTP email', [
+                        'email' => $pendingRegistration['email'],
+                        'error' => $result['error'] ?? 'Unknown error'
+                    ]);
+                    return response()->json([
+                        'message' => 'Gagal mengirim email OTP: ' . ($result['error'] ?? 'Unknown error')
+                    ], 500);
+                }
+            } catch (\Exception $emailError) {
+                Log::error('Exception resending OTP email', [
+                    'email' => $pendingRegistration['email'],
+                    'error' => $emailError->getMessage()
+                ]);
+                return response()->json([
+                    'message' => 'Gagal mengirim email OTP: ' . $emailError->getMessage()
+                ], 500);
+            }
 
-        return response()->json([
-            'message'=>'Kode OTP baru telah dikirim ke email Anda. Silakan periksa inbox email Anda.',
-            'user_id'=>$user->id
-        ]);
+            return response()->json([
+                'message' => 'Kode OTP baru telah dikirim ke email Anda. Silakan periksa inbox email Anda.',
+                'email' => $pendingRegistration['email']
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Resend OTP failed', [
+                'error' => $e->getMessage()
+            ]);
+            return response()->json([
+                'message' => 'Gagal mengirim ulang OTP: ' . $e->getMessage()
+            ], 500);
+        }
     }
 }
