@@ -99,23 +99,28 @@ class AuthController extends Controller {
         $user = User::where('email',$req->email)->first();
 
         if(!$user){
-            return response()->json(['message'=>'User not found'],404);
+            return response()->json([
+                'message' => 'Email tidak terdaftar. Silakan daftar terlebih dahulu untuk membuat akun baru.',
+                'error_type' => 'user_not_found',
+                'suggestion' => 'Apakah Anda belum memiliki akun? Silakan daftar di halaman registrasi.'
+            ], 404);
         }
 
         if(!Hash::check($req->password, $user->password)){
-            return response()->json(['message'=>'Invalid password'],401);
+            return response()->json([
+                'message' => 'Password salah. Silakan periksa kembali password Anda.',
+                'error_type' => 'invalid_password'
+            ], 401);
         }
 
         // Debug: Check email verification status
         if(!$user->email_verified_at){
             return response()->json([
-                'message'=>'Email not verified. Please verify your email first.',
-                'debug_info' => [
-                    'user_id' => $user->id,
-                    'email_verified_at' => $user->email_verified_at,
-                    'created_at' => $user->created_at
-                ]
-            ],403);
+                'message' => 'Email belum terverifikasi. Silakan verifikasi email Anda terlebih dahulu untuk melanjutkan login.',
+                'error_type' => 'email_not_verified',
+                'user_id' => $user->id,
+                'suggestion' => 'Periksa inbox email Anda untuk kode OTP verifikasi. Jika tidak menerima email, silakan request OTP baru.'
+            ], 403);
         }
 
         $token = $user->createToken('api')->plainTextToken;
