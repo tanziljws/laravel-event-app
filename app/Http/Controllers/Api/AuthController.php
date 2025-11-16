@@ -36,17 +36,40 @@ class AuthController extends Controller {
             try {
                 \Log::info('Sending OTP email for registration', [
                     'user_id' => $user->id,
-                    'email' => $user->email
+                    'email' => $user->email,
+                    'otp' => $otp
                 ]);
                 
-                SendOtpJob::dispatchSync($user, $otp, 'verification');
+                // Call BrevoService directly instead of using Job for immediate execution
+                $brevoService = new \App\Services\BrevoService();
+                $result = $brevoService->sendEmailWithView(
+                    $user->email,
+                    $user->name,
+                    'Verifikasi Email - EduFest',
+                    'emails.otp',
+                    [
+                        'user' => $user,
+                        'otp' => $otp,
+                        'type' => 'verification'
+                    ]
+                );
                 
-                \Log::info('OTP email sent successfully', [
-                    'user_id' => $user->id,
-                    'email' => $user->email
-                ]);
+                if ($result['success']) {
+                    \Log::info('OTP email sent successfully', [
+                        'user_id' => $user->id,
+                        'email' => $user->email,
+                        'message_id' => $result['message_id'] ?? 'N/A'
+                    ]);
+                } else {
+                    \Log::error('Failed to send OTP email during registration', [
+                        'user_id' => $user->id,
+                        'email' => $user->email,
+                        'error' => $result['error'] ?? 'Unknown error',
+                        'full_error' => $result['full_error'] ?? null
+                    ]);
+                }
             } catch (\Exception $emailError) {
-                \Log::error('Failed to send OTP email during registration', [
+                \Log::error('Exception sending OTP email during registration', [
                     'user_id' => $user->id,
                     'email' => $user->email,
                     'error' => $emailError->getMessage(),
