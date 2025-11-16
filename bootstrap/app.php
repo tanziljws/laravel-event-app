@@ -29,7 +29,9 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
         
         // Tambahkan session middleware untuk API routes yang memerlukan session (registration)
+        // CORS middleware harus dijalankan SEBELUM session middleware
         $middleware->group('api.session', [
+            \App\Http\Middleware\CustomCors::class, // CORS harus di awal
             \Illuminate\Cookie\Middleware\EncryptCookies::class,
             \Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse::class,
             \Illuminate\Session\Middleware\StartSession::class,

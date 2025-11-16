@@ -47,13 +47,21 @@ class CustomCors
             $response = $next($request);
         }
 
-        // Set CORS headers
+        // Set CORS headers - HARUS di-set untuk semua response
         if ($allowedOrigin) {
             $response->headers->set('Access-Control-Allow-Origin', $allowedOrigin);
             $response->headers->set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
             $response->headers->set('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin, X-XSRF-TOKEN');
             $response->headers->set('Access-Control-Allow-Credentials', 'true');
             $response->headers->set('Access-Control-Max-Age', '3600');
+            $response->headers->set('Access-Control-Expose-Headers', 'Content-Length, Content-Type');
+        } else {
+            // Log jika origin tidak diizinkan
+            \Log::warning('CORS: Origin not allowed', [
+                'origin' => $origin,
+                'path' => $request->path(),
+                'method' => $request->method(),
+            ]);
         }
 
         return $response;
