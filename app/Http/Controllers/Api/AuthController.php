@@ -47,7 +47,9 @@ class AuthController extends Controller {
 
             Log::info('Registration data saved to session', [
                 'email' => $email,
-                'otp_expires_at' => session('pending_registration')['otp_expires_at']
+                'otp_expires_at' => session('pending_registration')['otp_expires_at'],
+                'session_id' => session()->getId(),
+                'has_session' => session()->has('pending_registration')
             ]);
 
             // Send OTP via email (sync untuk memastikan langsung terkirim)
@@ -77,7 +79,9 @@ class AuthController extends Controller {
                 if ($result['success']) {
                     Log::info('OTP email sent successfully', [
                         'email' => $email,
-                        'message_id' => $result['message_id'] ?? 'N/A'
+                        'message_id' => $result['message_id'] ?? 'N/A',
+                        'otp' => $otp, // Log OTP untuk debugging (HAPUS di production!)
+                        'session_id' => session()->getId()
                     ]);
                 } else {
                     Log::error('Failed to send OTP email during registration', [
@@ -116,7 +120,7 @@ class AuthController extends Controller {
             ]);
             // Clear session on error
             session()->forget('pending_registration');
-            return response()->json([
+        return response()->json([
                 'message' => 'Registrasi gagal: ' . $e->getMessage()
             ], 500);
         }
@@ -128,11 +132,11 @@ class AuthController extends Controller {
             $pendingRegistration = session('pending_registration');
             
             if (!$pendingRegistration) {
-                return response()->json([
+            return response()->json([
                     'message' => 'Sesi registrasi tidak ditemukan. Silakan daftar ulang.',
                     'error_type' => 'session_expired'
-                ], 404);
-            }
+            ], 404);
+        }
 
             // 1. Cek OTP Expiry (10 menit)
             $otpExpiresAt = Carbon::parse($pendingRegistration['otp_expires_at']);
@@ -185,7 +189,7 @@ class AuthController extends Controller {
             // 6. Auto login user (create token)
             $token = $user->createToken('api')->plainTextToken;
 
-            return response()->json([
+        return response()->json([
                 'message' => 'Email berhasil diverifikasi. Akun Anda telah dibuat.',
                 'user' => $user,
                 'token' => $token,
@@ -225,7 +229,7 @@ class AuthController extends Controller {
             return response()->json([
                 'message' => 'Email belum terverifikasi. Silakan verifikasi email Anda terlebih dahulu untuk melanjutkan login.',
                 'error_type' => 'email_not_verified',
-                'user_id' => $user->id,
+                    'user_id' => $user->id,
                 'suggestion' => 'Periksa inbox email Anda untuk kode OTP verifikasi. Jika tidak menerima email, silakan request OTP baru.'
             ], 403);
         }
