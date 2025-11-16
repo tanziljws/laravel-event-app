@@ -7,9 +7,9 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
-use Illuminate\Support\Facades\Mail;
 use App\Models\User;
 use App\Models\Event;
+use App\Services\BrevoService;
 
 class SendRegistrationTokenJob implements ShouldQueue
 {
@@ -68,10 +68,13 @@ class SendRegistrationTokenJob implements ShouldQueue
         <strong>Tim EduFest SMKN 4 Bogor</strong></p>
         ";
 
-        Mail::html($message, function ($mail) use ($subject) {
-            $mail->to($this->user->email, $this->user->name)
-                 ->subject($subject)
-                 ->from(config('mail.from.address'), config('mail.from.name'));
-        });
+        $brevoService = new BrevoService();
+        
+        $brevoService->sendEmail(
+            $this->user->email,
+            $this->user->name,
+            $subject,
+            $message
+        );
     }
 }

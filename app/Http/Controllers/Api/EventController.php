@@ -79,11 +79,37 @@ class EventController extends Controller
                     if ($event->certificate_template_path) {
                         $event->certificate_template_url = url('storage/' . $event->certificate_template_path);
                     }
+                    
+                    // Add photos from fotos table (with error handling)
+                    try {
+                        $fotos = \App\Models\Foto::where('galery_id', $event->id)->get();
+                        $event->fotos = $fotos->map(function ($foto) {
+                            return [
+                                'id' => $foto->id,
+                                'url' => asset('storage/fotos/' . $foto->file),
+                                'file' => $foto->file,
+                                'likes' => $foto->likes ?? 0,
+                                'dislikes' => $foto->dislikes ?? 0,
+                            ];
+                        });
+                        
+                        // If no flyer/image but has fotos, use first foto as image_url
+                        if (!$event->flyer_url && !$event->image_url && $event->fotos->count() > 0) {
+                            $firstFoto = $event->fotos->first();
+                            if ($firstFoto && isset($firstFoto['url'])) {
+                                $event->image_url = $firstFoto['url'];
+                            }
+                        }
+                    } catch (\Exception $fotoError) {
+                        \Log::warning('Error loading fotos for event ' . $event->id . ': ' . $fotoError->getMessage());
+                        $event->fotos = collect([]);
+                    }
                 } catch (\Exception $e) {
                     \Log::error('Events index error: ' . $e->getMessage());
                     // Set default values if parsing fails
                     $event->registration_open = true;
                     $event->can_register = true;
+                    $event->fotos = collect([]);
                 }
                 
                 return $event;
@@ -203,17 +229,53 @@ class EventController extends Controller
 
     public function show(Event $event)
     {
-        // Add full URL for flyer if exists
-        if ($event->flyer_path) {
-            $event->flyer_url = url('storage/' . $event->flyer_path);
+        try {
+            // Add full URL for flyer if exists
+            if ($event->flyer_path) {
+                $event->flyer_url = url('storage/' . $event->flyer_path);
+            }
+            
+            // Add full URL for certificate template if exists
+            if ($event->certificate_template_path) {
+                $event->certificate_template_url = url('storage/' . $event->certificate_template_path);
+            }
+            
+            // Add photos from fotos table (with error handling)
+            try {
+                $fotos = \App\Models\Foto::where('galery_id', $event->id)->get();
+                $event->fotos = $fotos->map(function ($foto) {
+                    return [
+                        'id' => $foto->id,
+                        'url' => asset('storage/fotos/' . $foto->file),
+                        'file' => $foto->file,
+                        'likes' => $foto->likes ?? 0,
+                        'dislikes' => $foto->dislikes ?? 0,
+                    ];
+                });
+                
+                // If no flyer/image but has fotos, use first foto as image_url
+                if (!$event->flyer_url && !$event->image_url && $event->fotos->count() > 0) {
+                    $firstFoto = $event->fotos->first();
+                    if ($firstFoto && isset($firstFoto['url'])) {
+                        $event->image_url = $firstFoto['url'];
+                    }
+                }
+            } catch (\Exception $fotoError) {
+                \Log::warning('Error loading fotos for event ' . $event->id . ': ' . $fotoError->getMessage());
+                $event->fotos = collect([]);
+            }
+            
+            return response()->json($event);
+        } catch (\Exception $e) {
+            \Log::error('Error in EventController@show: ' . $e->getMessage(), [
+                'event_id' => $event->id ?? null,
+                'trace' => $e->getTraceAsString()
+            ]);
+            return response()->json([
+                'error' => 'Failed to fetch event',
+                'message' => $e->getMessage()
+            ], 500);
         }
-        
-        // Add full URL for certificate template if exists
-        if ($event->certificate_template_path) {
-            $event->certificate_template_url = url('storage/' . $event->certificate_template_path);
-        }
-        
-        return $event;
     }
 
     public function update(Request $r, Event $event)

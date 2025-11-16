@@ -6,8 +6,8 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
-use Illuminate\Support\Facades\Mail;
 use App\Models\User;
+use App\Services\BrevoService;
 
 class SendOtpJob implements ShouldQueue
 {
@@ -36,13 +36,18 @@ class SendOtpJob implements ShouldQueue
             ? 'Verifikasi Email - EduFest' 
             : 'Reset Password - EduFest';
 
-        Mail::send('emails.otp', [
-            'user' => $this->user,
-            'otp' => $this->otp,
-            'type' => $this->type
-        ], function ($mail) use ($subject) {
-            $mail->to($this->user->email, $this->user->name)
-                 ->subject($subject);
-        });
+        $brevoService = new BrevoService();
+        
+        $brevoService->sendEmailWithView(
+            $this->user->email,
+            $this->user->name,
+            $subject,
+            'emails.otp',
+            [
+                'user' => $this->user,
+                'otp' => $this->otp,
+                'type' => $this->type
+            ]
+        );
     }
 }

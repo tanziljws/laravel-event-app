@@ -17,6 +17,7 @@ use App\Http\Controllers\ChangePasswordController;
 use App\Http\Controllers\Api\ContactMessageController;
 use App\Http\Controllers\Api\BannerController;
 use App\Http\Controllers\Api\Admin\BannerController as AdminBannerController;
+use App\Http\Controllers\Api\Admin\FotoController as AdminFotoController;
 
 Route::post('/auth/register', [AuthController::class, 'register']);
 Route::post('/auth/verify-email', [AuthController::class, 'verifyEmail']);
@@ -89,6 +90,12 @@ Route::post('/admin/banners', [AdminBannerController::class, 'store']);
 Route::post('/admin/banners/{banner}', [AdminBannerController::class, 'update']);
 Route::delete('/admin/banners/{banner}', [AdminBannerController::class, 'destroy']);
 Route::post('/admin/banners/{banner}/toggle', [AdminBannerController::class, 'toggleActive']);
+
+// Admin Fotos - NO AUTH for testing
+Route::get('/admin/events/{event}/fotos', [AdminFotoController::class, 'index']);
+Route::post('/admin/events/{event}/fotos', [AdminFotoController::class, 'store']);
+Route::post('/admin/events/{event}/fotos/{foto}', [AdminFotoController::class, 'update']);
+Route::delete('/admin/events/{event}/fotos/{foto}', [AdminFotoController::class, 'destroy']);
 
 // Admin Export - NO AUTH for testing
 Route::get('/admin/events/{event}/export-participants', [AdminReportController::class, 'exportParticipants']);

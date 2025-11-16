@@ -3,7 +3,7 @@
 namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\Mail;
+use App\Services\BrevoService;
 
 class TestEmail extends Command
 {
@@ -29,14 +29,35 @@ class TestEmail extends Command
         $email = $this->argument('email');
         
         try {
-            Mail::raw('Test email from Laravel Event App', function ($message) use ($email) {
-                $message->to($email)
-                        ->subject('Test Email - Laravel Event App');
-            });
+            $brevoService = new BrevoService();
             
-            $this->info("Test email sent successfully to {$email}");
+            $htmlContent = "
+                <html>
+                <body>
+                    <h2>Test Email dari Laravel Event App</h2>
+                    <p>Ini adalah email test untuk memverifikasi konfigurasi Brevo API.</p>
+                    <p>Jika Anda menerima email ini, berarti konfigurasi Brevo API sudah berfungsi dengan baik!</p>
+                    <hr>
+                    <p style='color: #666; font-size: 12px;'>Email ini dikirim pada: " . now()->format('d F Y H:i:s') . "</p>
+                </body>
+                </html>
+            ";
+            
+            $result = $brevoService->sendEmail(
+                $email,
+                'Test User',
+                'Test Email - Laravel Event App',
+                $htmlContent
+            );
+            
+            if ($result['success']) {
+                $this->info("✅ Test email sent successfully to {$email}");
+                $this->info("Message ID: " . ($result['message_id'] ?? 'N/A'));
+            } else {
+                $this->error("❌ Failed to send email: " . ($result['error'] ?? 'Unknown error'));
+            }
         } catch (\Exception $e) {
-            $this->error("Failed to send email: " . $e->getMessage());
+            $this->error("❌ Exception: " . $e->getMessage());
         }
     }
 }

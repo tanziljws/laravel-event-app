@@ -59,6 +59,14 @@ class Event extends Model
     }
 
     /**
+     * Photos/Gallery for this event (assuming galery_id = event_id)
+     */
+    public function fotos()
+    {
+        return $this->hasMany(Foto::class, 'galery_id', 'id');
+    }
+
+    /**
      * Accessor: Absolute URL for flyer image
      */
     public function getFlyerUrlAttribute(): ?string
