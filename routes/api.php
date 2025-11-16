@@ -19,12 +19,32 @@ use App\Http\Controllers\Api\BannerController;
 use App\Http\Controllers\Api\Admin\BannerController as AdminBannerController;
 use App\Http\Controllers\Api\Admin\FotoController as AdminFotoController;
 
-// Auth routes yang memerlukan session (registration flow)
-Route::middleware('api.session')->group(function () {
-    Route::post('/auth/register', [AuthController::class, 'register']);
-    Route::post('/auth/verify-email', [AuthController::class, 'verifyEmail']);
-    Route::post('/auth/resend-otp', [AuthController::class, 'resendOtp']);
-});
+// CRITICAL FIX: Handle OPTIONS preflight requests for Safari
+// Safari mengirim OPTIONS untuk preflight, jika tidak di-handle akan fallback ke GET
+// Ini menyebabkan MethodNotAllowedHttpException
+Route::options('{any}', function () {
+    $origin = request()->headers->get('Origin');
+    $allowedOrigins = [
+        'https://frontend-reactjs-production.up.railway.app',
+        'http://localhost:3000',
+        'http://localhost:5173',
+    ];
+    
+    // Check if origin is allowed
+    $allowedOrigin = in_array($origin, $allowedOrigins) ? $origin : '*';
+    
+    return response()->json(['status' => 'ok'], 200)
+        ->header('Access-Control-Allow-Origin', $allowedOrigin)
+        ->header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin, X-XSRF-TOKEN')
+        ->header('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS')
+        ->header('Access-Control-Allow-Credentials', 'false')
+        ->header('Access-Control-Max-Age', '3600');
+})->where('any', '.*');
+
+// Auth routes - TIDAK pakai session middleware karena Railway Proxy conflict
+Route::post('/auth/register', [AuthController::class, 'register']);
+Route::post('/auth/verify-email', [AuthController::class, 'verifyEmail']);
+Route::post('/auth/resend-otp', [AuthController::class, 'resendOtp']);
 
 // Auth routes yang tidak memerlukan session
 Route::post('/auth/login', [AuthController::class, 'login']);
