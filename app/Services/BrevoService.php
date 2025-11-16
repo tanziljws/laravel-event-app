@@ -131,9 +131,33 @@ class BrevoService
         string $view,
         array $data = []
     ): array {
-        $htmlContent = view($view, $data)->render();
+        try {
+            \Log::info('Rendering email view', [
+                'view' => $view,
+                'to' => $to,
+                'subject' => $subject
+            ]);
+            
+            $htmlContent = view($view, $data)->render();
+            
+            \Log::info('Email view rendered successfully', [
+                'view' => $view,
+                'content_length' => strlen($htmlContent)
+            ]);
 
-        return $this->sendEmail($to, $toName, $subject, $htmlContent);
+            return $this->sendEmail($to, $toName, $subject, $htmlContent);
+        } catch (\Exception $e) {
+            \Log::error('Failed to render email view', [
+                'view' => $view,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            
+            return [
+                'success' => false,
+                'error' => 'Failed to render email template: ' . $e->getMessage()
+            ];
+        }
     }
 }
 

@@ -14,30 +14,60 @@ use Illuminate\Http\Request;
 
 class AuthController extends Controller {
     public function register(RegisterRequest $req){
-        $user = User::create([
-            'name'=>$req->name,
-            'email'=>$req->email,
-            'phone'=>$req->phone,
-            'address'=>$req->address,
-            'education'=>$req->education,
-            'password'=>Hash::make($req->password)
-        ]);
+        try {
+            $user = User::create([
+                'name'=>$req->name,
+                'email'=>$req->email,
+                'phone'=>$req->phone,
+                'address'=>$req->address,
+                'education'=>$req->education,
+                'password'=>Hash::make($req->password)
+            ]);
 
-        $otp = str_pad((string)random_int(0,999999),6,'0',STR_PAD_LEFT);
-        EmailOtp::create([
-            'user_id'=>$user->id,
-            'code_hash'=>Hash::make($otp),
-            'type'=>'verification',
-            'expires_at'=>now()->addMinutes(10)
-        ]);
+            $otp = str_pad((string)random_int(0,999999),6,'0',STR_PAD_LEFT);
+            EmailOtp::create([
+                'user_id'=>$user->id,
+                'code_hash'=>Hash::make($otp),
+                'type'=>'verification',
+                'expires_at'=>now()->addMinutes(10)
+            ]);
 
-        // Send OTP via email (sync untuk memastikan langsung terkirim)
-        SendOtpJob::dispatchSync($user, $otp, 'verification');
+            // Send OTP via email (sync untuk memastikan langsung terkirim)
+            try {
+                \Log::info('Sending OTP email for registration', [
+                    'user_id' => $user->id,
+                    'email' => $user->email
+                ]);
+                
+                SendOtpJob::dispatchSync($user, $otp, 'verification');
+                
+                \Log::info('OTP email sent successfully', [
+                    'user_id' => $user->id,
+                    'email' => $user->email
+                ]);
+            } catch (\Exception $emailError) {
+                \Log::error('Failed to send OTP email during registration', [
+                    'user_id' => $user->id,
+                    'email' => $user->email,
+                    'error' => $emailError->getMessage(),
+                    'trace' => $emailError->getTraceAsString()
+                ]);
+                // Don't fail registration if email fails, but log it
+            }
 
-        return response()->json([
-            'message'=>'Registered. Check email for OTP.',
-            'user_id'=>$user->id
-        ],201);
+            return response()->json([
+                'message'=>'Registered. Check email for OTP.',
+                'user_id'=>$user->id
+            ],201);
+        } catch (\Exception $e) {
+            \Log::error('Registration failed', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            return response()->json([
+                'message' => 'Registration failed: ' . $e->getMessage()
+            ], 500);
+        }
     }
 
     public function verifyEmail(VerifyOtpRequest $req){
