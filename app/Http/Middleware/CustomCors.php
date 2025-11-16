@@ -25,20 +25,38 @@ class CustomCors
             env('FRONTEND_URL', 'http://localhost:3000'),
         ];
 
+        // Remove null/empty values
+        $allowedOrigins = array_filter($allowedOrigins);
+
         // Get the origin from the request
         $origin = $request->headers->get('Origin');
+        
+        // Fallback: jika tidak ada Origin header, cek Referer header
+        if (!$origin) {
+            $referer = $request->headers->get('Referer');
+            if ($referer) {
+                $parsedUrl = parse_url($referer);
+                if ($parsedUrl) {
+                    $origin = ($parsedUrl['scheme'] ?? 'https') . '://' . ($parsedUrl['host'] ?? '');
+                    if (isset($parsedUrl['port'])) {
+                        $origin .= ':' . $parsedUrl['port'];
+                    }
+                }
+            }
+        }
 
-        // Log for debugging (remove in production if needed)
+        // Log for debugging
         \Log::info('CORS Middleware', [
             'origin' => $origin,
             'allowed_origins' => $allowedOrigins,
-            'is_allowed' => in_array($origin, $allowedOrigins),
+            'is_allowed' => $origin && in_array($origin, $allowedOrigins),
             'path' => $request->path(),
             'method' => $request->method(),
+            'referer' => $request->headers->get('Referer'),
         ]);
 
         // Check if origin is allowed
-        $allowedOrigin = in_array($origin, $allowedOrigins) ? $origin : null;
+        $allowedOrigin = ($origin && in_array($origin, $allowedOrigins)) ? $origin : null;
 
         // Handle preflight OPTIONS request
         if ($request->getMethod() === 'OPTIONS') {
