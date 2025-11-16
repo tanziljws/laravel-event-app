@@ -75,17 +75,29 @@ class BrevoService
                     'response' => $response->json(),
                 ];
             } else {
+                $errorData = $response->json();
+                $errorMessage = $errorData['message'] ?? 'Failed to send email';
+                
+                // Log full error response for debugging
                 Log::error('Brevo email failed', [
                     'to' => $to,
                     'subject' => $subject,
                     'status' => $response->status(),
-                    'error' => $response->json(),
+                    'error' => $errorData,
+                    'response_body' => $response->body(),
                 ]);
+
+                // Check if it's a sender activation issue
+                if (str_contains(strtolower($errorMessage), 'smtp account') || 
+                    str_contains(strtolower($errorMessage), 'not yet activated')) {
+                    $errorMessage = 'Sender email belum diaktifkan di Brevo. Silakan aktifkan sender di Brevo dashboard: https://app.brevo.com → Senders → Aktifkan sender untuk sending. Error: ' . $errorMessage;
+                }
 
                 return [
                     'success' => false,
-                    'error' => $response->json()['message'] ?? 'Failed to send email',
+                    'error' => $errorMessage,
                     'status' => $response->status(),
+                    'full_error' => $errorData,
                 ];
             }
         } catch (\Exception $e) {
