@@ -58,18 +58,30 @@ class CustomCors
         // Check if origin is allowed
         $allowedOrigin = ($origin && in_array($origin, $allowedOrigins)) ? $origin : null;
 
-        // Handle preflight OPTIONS request
+        // Handle preflight OPTIONS request - HARUS di-handle di middleware SEBELUM route matching
+        // Ini critical untuk Safari yang strict dengan CORS
         if ($request->getMethod() === 'OPTIONS') {
-            $response = response('', 200);
+            \Log::info('CORS: Handling OPTIONS preflight request', [
+                'path' => $request->path(),
+                'origin' => $origin,
+                'allowed' => $allowedOrigin ? 'yes' : 'no'
+            ]);
             
-            // Set CORS headers untuk OPTIONS
-            // NOTE: Access-Control-Allow-Credentials di-disable karena Railway Proxy conflict
+            $response = response()->json(['status' => 'ok'], 200);
+            
+            // Set CORS headers untuk OPTIONS - HARUS di-set dengan benar
             if ($allowedOrigin) {
-                $response->headers->set('Access-Control-Allow-Origin', $allowedOrigin);
-                $response->headers->set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
-                $response->headers->set('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin, X-XSRF-TOKEN');
-                // $response->headers->set('Access-Control-Allow-Credentials', 'true'); // Disabled karena Railway Proxy conflict
-                $response->headers->set('Access-Control-Max-Age', '3600');
+                $response->headers->set('Access-Control-Allow-Origin', $allowedOrigin, true);
+                $response->headers->set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH', true);
+                $response->headers->set('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin, X-XSRF-TOKEN', true);
+                $response->headers->set('Access-Control-Allow-Credentials', 'false', true);
+                $response->headers->set('Access-Control-Max-Age', '3600', true);
+            } else {
+                // Fallback: allow origin jika tidak match (untuk development)
+                $response->headers->set('Access-Control-Allow-Origin', '*', true);
+                $response->headers->set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH', true);
+                $response->headers->set('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin, X-XSRF-TOKEN', true);
+                $response->headers->set('Access-Control-Max-Age', '3600', true);
             }
             
             return $response;
