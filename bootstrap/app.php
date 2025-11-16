@@ -18,8 +18,9 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
         
         // Enable CORS untuk React frontend
+        // Gunakan custom CORS middleware untuk memastikan headers di-set dengan benar
         $middleware->api(prepend: [
-            \Illuminate\Http\Middleware\HandleCors::class,
+            \App\Http\Middleware\CustomCors::class,
         ]);
         
         // Daftarin middleware groups untuk Laravel 12
