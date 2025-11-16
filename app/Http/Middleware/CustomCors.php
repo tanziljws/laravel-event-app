@@ -28,6 +28,15 @@ class CustomCors
         // Get the origin from the request
         $origin = $request->headers->get('Origin');
 
+        // Log for debugging (remove in production if needed)
+        \Log::info('CORS Middleware', [
+            'origin' => $origin,
+            'allowed_origins' => $allowedOrigins,
+            'is_allowed' => in_array($origin, $allowedOrigins),
+            'path' => $request->path(),
+            'method' => $request->method(),
+        ]);
+
         // Check if origin is allowed
         $allowedOrigin = in_array($origin, $allowedOrigins) ? $origin : null;
 
