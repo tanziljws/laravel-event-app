@@ -61,22 +61,49 @@ class CustomCors
         // Handle preflight OPTIONS request
         if ($request->getMethod() === 'OPTIONS') {
             $response = response('', 200);
-        } else {
-            $response = $next($request);
+            
+            // Set CORS headers untuk OPTIONS
+            if ($allowedOrigin) {
+                $response->headers->set('Access-Control-Allow-Origin', $allowedOrigin);
+                $response->headers->set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
+                $response->headers->set('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin, X-XSRF-TOKEN');
+                $response->headers->set('Access-Control-Allow-Credentials', 'true');
+                $response->headers->set('Access-Control-Max-Age', '3600');
+            }
+            
+            return $response;
         }
 
+        // Process request
+        $response = $next($request);
+
         // Set CORS headers - HARUS di-set untuk semua response
+        // Gunakan set() dan remove() untuk memastikan tidak ada conflict
         if ($allowedOrigin) {
-            $response->headers->set('Access-Control-Allow-Origin', $allowedOrigin);
-            $response->headers->set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
-            $response->headers->set('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin, X-XSRF-TOKEN');
-            $response->headers->set('Access-Control-Allow-Credentials', 'true');
-            $response->headers->set('Access-Control-Max-Age', '3600');
-            $response->headers->set('Access-Control-Expose-Headers', 'Content-Length, Content-Type');
+            // Remove any existing CORS headers yang mungkin conflict
+            $response->headers->remove('Access-Control-Allow-Origin');
+            $response->headers->remove('Access-Control-Allow-Methods');
+            $response->headers->remove('Access-Control-Allow-Headers');
+            $response->headers->remove('Access-Control-Allow-Credentials');
+            
+            // Set CORS headers dengan cara yang lebih reliable
+            $response->headers->set('Access-Control-Allow-Origin', $allowedOrigin, true);
+            $response->headers->set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH', true);
+            $response->headers->set('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin, X-XSRF-TOKEN', true);
+            $response->headers->set('Access-Control-Allow-Credentials', 'true', true);
+            $response->headers->set('Access-Control-Max-Age', '3600', true);
+            $response->headers->set('Access-Control-Expose-Headers', 'Content-Length, Content-Type', true);
+            
+            \Log::info('CORS headers set', [
+                'origin' => $allowedOrigin,
+                'path' => $request->path(),
+                'headers' => $response->headers->all(),
+            ]);
         } else {
             // Log jika origin tidak diizinkan
             \Log::warning('CORS: Origin not allowed', [
                 'origin' => $origin,
+                'allowed_origins' => $allowedOrigins,
                 'path' => $request->path(),
                 'method' => $request->method(),
             ]);

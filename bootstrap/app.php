@@ -18,10 +18,7 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
         
         // Enable CORS untuk React frontend
-        // Gunakan custom CORS middleware sebagai GLOBAL middleware untuk semua request
-        $middleware->append(\App\Http\Middleware\CustomCors::class);
-        
-        // Juga tambahkan di API prepend untuk memastikan
+        // PASTIKAN CORS middleware dijalankan PERTAMA untuk semua API routes
         $middleware->api(prepend: [
             \App\Http\Middleware\CustomCors::class,
         ]);
