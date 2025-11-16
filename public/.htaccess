@@ -5,18 +5,9 @@
 
     RewriteEngine On
 
-    # CORS Headers untuk API dan Storage
-    <IfModule mod_headers.c>
-        # Handle preflight OPTIONS request
-        RewriteCond %{REQUEST_METHOD} OPTIONS
-        RewriteRule ^(.*)$ $1 [R=200,L]
-        
-        # Set CORS headers
-        Header always set Access-Control-Allow-Origin "*"
-        Header always set Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS, PATCH"
-        Header always set Access-Control-Allow-Headers "Content-Type, Authorization, X-Requested-With, Accept, Origin"
-        Header always set Access-Control-Max-Age "3600"
-    </IfModule>
+    # CORS Headers di-handle oleh Laravel HandleCors middleware
+    # Jangan set wildcard (*) karena conflict dengan supports_credentials: true
+    # CORS config ada di config/cors.php
 
     # Handle Authorization Header
     RewriteCond %{HTTP:Authorization} .

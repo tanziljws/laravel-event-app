@@ -27,6 +27,8 @@ return [
         'https://frontend-reactjs-production.up.railway.app',
         env('FRONTEND_URL', 'http://localhost:3000'),
     ],
+    
+    // Pastikan tidak ada wildcard jika supports_credentials = true
 
     'allowed_origins_patterns' => [],
 
