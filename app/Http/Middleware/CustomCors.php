@@ -63,11 +63,12 @@ class CustomCors
             $response = response('', 200);
             
             // Set CORS headers untuk OPTIONS
+            // NOTE: Access-Control-Allow-Credentials di-disable karena Railway Proxy conflict
             if ($allowedOrigin) {
                 $response->headers->set('Access-Control-Allow-Origin', $allowedOrigin);
                 $response->headers->set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
                 $response->headers->set('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin, X-XSRF-TOKEN');
-                $response->headers->set('Access-Control-Allow-Credentials', 'true');
+                // $response->headers->set('Access-Control-Allow-Credentials', 'true'); // Disabled karena Railway Proxy conflict
                 $response->headers->set('Access-Control-Max-Age', '3600');
             }
             
@@ -87,10 +88,12 @@ class CustomCors
             $response->headers->remove('Access-Control-Allow-Credentials');
             
             // Set CORS headers dengan cara yang lebih reliable
+            // NOTE: Access-Control-Allow-Credentials di-disable karena Railway Proxy
+            // mengeluarkan CORS wildcard (*) yang tidak bisa di-override
             $response->headers->set('Access-Control-Allow-Origin', $allowedOrigin, true);
             $response->headers->set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH', true);
             $response->headers->set('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin, X-XSRF-TOKEN', true);
-            $response->headers->set('Access-Control-Allow-Credentials', 'true', true);
+            // $response->headers->set('Access-Control-Allow-Credentials', 'true', true); // Disabled karena Railway Proxy conflict
             $response->headers->set('Access-Control-Max-Age', '3600', true);
             $response->headers->set('Access-Control-Expose-Headers', 'Content-Length, Content-Type', true);
             

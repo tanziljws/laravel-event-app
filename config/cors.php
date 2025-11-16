@@ -38,6 +38,6 @@ return [
 
     'max_age' => 0,
 
-    'supports_credentials' => true, // Enable untuk session cookies
+    'supports_credentials' => false, // Disabled karena Railway Proxy mengeluarkan CORS wildcard (*)
 
 ];
