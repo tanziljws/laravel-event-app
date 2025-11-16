@@ -21,6 +21,7 @@ use App\Http\Controllers\Api\Admin\FotoController as AdminFotoController;
 
 Route::post('/auth/register', [AuthController::class, 'register']);
 Route::post('/auth/verify-email', [AuthController::class, 'verifyEmail']);
+Route::post('/auth/resend-otp', [AuthController::class, 'resendOtp']);
 Route::post('/auth/login', [AuthController::class, 'login']);
 Route::post('/auth/request-reset', [AuthController::class, 'requestReset']);
 Route::post('/auth/reset-password', [AuthController::class, 'resetPassword']);

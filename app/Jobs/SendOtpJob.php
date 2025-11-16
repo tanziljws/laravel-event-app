@@ -38,7 +38,7 @@ class SendOtpJob implements ShouldQueue
 
         $brevoService = new BrevoService();
         
-        $brevoService->sendEmailWithView(
+        $result = $brevoService->sendEmailWithView(
             $this->user->email,
             $this->user->name,
             $subject,
@@ -49,5 +49,15 @@ class SendOtpJob implements ShouldQueue
                 'type' => $this->type
             ]
         );
+
+        // Log hasil pengiriman
+        if (!$result['success']) {
+            \Log::error('Failed to send OTP email', [
+                'user_id' => $this->user->id,
+                'email' => $this->user->email,
+                'error' => $result['error'] ?? 'Unknown error'
+            ]);
+            throw new \Exception('Failed to send OTP email: ' . ($result['error'] ?? 'Unknown error'));
+        }
     }
 }

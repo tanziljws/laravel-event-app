@@ -31,8 +31,8 @@ class AuthController extends Controller {
             'expires_at'=>now()->addMinutes(10)
         ]);
 
-        // Send OTP via email
-        SendOtpJob::dispatch($user, $otp, 'verification');
+        // Send OTP via email (sync untuk memastikan langsung terkirim)
+        SendOtpJob::dispatchSync($user, $otp, 'verification');
 
         return response()->json([
             'message'=>'Registered. Check email for OTP.',
@@ -207,5 +207,30 @@ class AuthController extends Controller {
         $otp->update(['used_at'=>now()]);
 
         return response()->json(['message'=>'Password reset successfully']);
+    }
+
+    public function resendOtp(Request $req){
+        $req->validate([
+            'user_id' => 'required|exists:users,id'
+        ]);
+
+        $user = User::findOrFail($req->user_id);
+
+        // Generate new OTP
+        $otp = str_pad((string)random_int(0,999999),6,'0',STR_PAD_LEFT);
+        EmailOtp::create([
+            'user_id'=>$user->id,
+            'code_hash'=>Hash::make($otp),
+            'type'=>'verification',
+            'expires_at'=>now()->addMinutes(10)
+        ]);
+
+        // Send OTP via email (sync untuk memastikan langsung terkirim)
+        SendOtpJob::dispatchSync($user, $otp, 'verification');
+
+        return response()->json([
+            'message'=>'Kode OTP baru telah dikirim ke email Anda. Silakan periksa inbox email Anda.',
+            'user_id'=>$user->id
+        ]);
     }
 }
