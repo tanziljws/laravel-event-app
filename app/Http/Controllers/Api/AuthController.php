@@ -16,6 +16,13 @@ use Carbon\Carbon;
 
 class AuthController extends Controller {
     public function register(RegisterRequest $req){
+        Log::info('=== REGISTER ENDPOINT HIT ===', [
+            'email' => $req->email,
+            'name' => $req->name,
+            'has_session' => session()->has('pending_registration'),
+            'session_id' => session()->getId()
+        ]);
+        
         try {
             // Normalize email (lowercase, trim)
             $email = strtolower(trim($req->email));
